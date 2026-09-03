@@ -4,12 +4,12 @@
 using namespace Rcpp;
 
 // [[Rcpp::export]]
-List sequential_kf_fast(NumericVector m_hat, 
-                        NumericMatrix s_hat, 
-                        NumericVector y, 
-                        NumericMatrix Hm, 
-                        NumericVector R_diag, 
-                        IntegerVector NA_ind) {
+List sequential_kf_fast(NumericVector m_hat, // mean vector (state estimate, prior)
+                        NumericMatrix s_hat, // covariance matrix (state estimate, prior)
+                        NumericVector y, // new observations (measurements)
+                        NumericMatrix Hm, //
+                        NumericVector R_diag, // diagonal of covariance matrix of observations (noise)
+                        IntegerVector NA_ind) { //overview of which sensors are NA
   
   int m = m_hat.size();
   int n_stations = y.size();
