@@ -1,6 +1,6 @@
-include("parameters.jl")
-include("spectral_discretization.jl")
-include("temporal_process.jl")
+include("../parameters.jl")
+include("../spectral_discretization.jl")
+include("../temporal_process.jl")
 
 using Plots
 

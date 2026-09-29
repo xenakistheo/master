@@ -2,9 +2,6 @@ include("parameters.jl")
 include("spectral_discretization.jl")
 
 
-
-
-
 function simulate_ck(μ, λ, Δt, N)
 
     z = randn(N) # Generate N standard normal random variables
