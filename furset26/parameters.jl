@@ -86,7 +86,7 @@ end
 
 
 #### Transform parameters to make them satisfy certain numerical bounds. 
-function θ_to_η(η)
+function η_to_θ(η)
 
     ν_s = exp(η[1]) + 0.25 
     ν_t = 7.5 * exp(η[2]) / (3 + 2.5*exp(η[2])) + 0.25
@@ -108,7 +108,7 @@ function θ_to_η(η)
     return θ
 end 
 
-function η_to_θ(θ)
+function θ_to_η(θ)
     ν_s, ν_t, r_t, r_s, σ, β_s, σ_obs = θ
     return [
         log(ν_s - 0.25),
