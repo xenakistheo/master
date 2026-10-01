@@ -64,9 +64,12 @@ Y_obs = y_LL[:, 1, :]
 # Create observation matrices
 H_spatial = build_observation_matrix(spatial_locations, Mx_inf, My_inf, D)
 H_full = build_full_spatial_matrix(H_spatial; Mx=Mx_inf, My=My_inf, m=m_order, m_params=params_LL)
+d_block = 2*m_order + floor(Int, params_LL.γ) # state dimension per mode, as in build_full_spatial_matrix
+idx = 1:d_block:size(F, 1) # index of c_k for each mode k
 
 # Run through Kalman Filter
-LOGLIKELIHOOD = KalmanFilter(; 
+# Run through Kalman Filter
+ll_plain = KalmanFilter(; 
     m_hat_0=zeros(size(F, 1)), # mean
     S_hat_0=S_init, # covariance
     F=F, # state transition matrix
@@ -75,3 +78,69 @@ LOGLIKELIHOOD = KalmanFilter(;
     Y=Y_obs, # observation matrix 
     σ_obs=σ_obs_LL, 
     )
+
+ll_batch = KalmanFilter_fast(; 
+    m_hat_0=zeros(size(F, 1)),
+    S_hat_0=S_init,
+    F=F,
+    Σ=Σ,
+    H_spatial=H_spatial,
+    idx=idx,
+    Y=Y_obs,
+    σ_obs=σ_obs_LL, 
+)
+
+ll_seq = KalmanFilter_sequential(; 
+    m_hat_0=zeros(size(F, 1)),
+    S_hat_0=S_init,
+    F=F,
+    Σ=Σ,
+    H_spatial=H_spatial,
+    idx=idx,
+    Y=Y_obs,
+    σ_obs=σ_obs_LL, 
+)
+
+
+@show ll_plain
+@show ll_batch
+@show ll_seq
+
+@show ll_batch - ll_seq
+@show ll_batch - ll_plain
+
+##### BENCHMARK TIME
+@btime KalmanFilter(; 
+    m_hat_0=zeros(size($F, 1)), # mean
+    S_hat_0=$S_init, # covariance
+    F=$F, # state transition matrix
+    Σ=$Σ, # process noise covariance
+    H=$H_full, # spatial coefficients matrix
+    Y=$Y_obs, # observation matrix 
+    σ_obs=$σ_obs_LL, 
+    )
+
+@btime KalmanFilter_fast(; 
+    m_hat_0=zeros(size($F, 1)),
+    S_hat_0=$S_init,
+    F=$F,
+    Σ=$Σ,
+    H_spatial=$H_spatial,
+    idx=$idx,
+    Y=$Y_obs,
+    σ_obs=$σ_obs_LL, 
+)
+
+@btime KalmanFilter_sequential(; 
+    m_hat_0=zeros(size($F, 1)),
+    S_hat_0=$S_init,
+    F=$F,
+    Σ=$Σ,
+    H_spatial=$H_spatial,
+    idx=$idx,
+    Y=$Y_obs,
+    σ_obs=$σ_obs_LL, 
+)
+
+
+

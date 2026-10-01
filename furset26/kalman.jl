@@ -124,7 +124,102 @@ function KalmanFilter_fast(;
     return LOG_SUM
 end
 
+function KalmanFilter_sequential(;
+    m_hat_0,
+    S_hat_0,
+    F,
+    Σ,
+    H_spatial,
+    idx,
+    Y,
+    σ_obs,
+)
+    m_hat = Vector{Float64}(m_hat_0)
+    S_hat = Matrix{Float64}(S_hat_0)
+    Σ_dense = Matrix{Float64}(Σ)
 
+    d = length(m_hat)
+    M = length(idx)
+
+    LOG_SUM = 0.0
+    log2π = log(2π)
+
+    # Work vector to avoid allocating for every observation
+    a = zeros(Float64, d)
+
+    for t in axes(Y, 1)
+
+        # --------------------------------------------------
+        # 1. Prediction
+        # --------------------------------------------------
+        m_hat = F * m_hat
+        S_hat = (F * S_hat) * F' + Σ_dense
+
+        # --------------------------------------------------
+        # 2. Sequential observation updates
+        # --------------------------------------------------
+        for j in axes(H_spatial, 1)
+
+            yj = Y[t, j]
+
+            # optionally skip missing observations
+            if ismissing(yj) || isnan(yj)
+                continue
+            end
+
+            h = @view H_spatial[j, :]
+
+            # Observation:
+            #
+            # y_j = h' * m[idx] + ε
+            #
+            # Innovation
+            dy = yj - dot(h, @view m_hat[idx])
+
+            # a = P * H_j'
+            #
+            # H_j only acts on state entries idx, so
+            # instead of P * full_H_j' we use:
+            #
+            #     P[:, idx] * h
+            #
+            mul!(a, @view(S_hat[:, idx]), h)
+
+            # scalar innovation variance:
+            #
+            # s_j = H_j P H_j' + σ²
+            #
+            sj = σ_obs^2 + dot(h, @view(a[idx]))
+
+            # log likelihood contribution
+            LOG_SUM += -0.5 * (
+                log2π +
+                log(sj) +
+                dy^2 / sj
+            )
+
+            # --------------------------------------------------
+            # posterior mean
+            #
+            # m <- m + a/sj * dy
+            # --------------------------------------------------
+            α = dy / sj
+            @. m_hat += α * a
+
+            # --------------------------------------------------
+            # posterior covariance
+            #
+            # P <- P - a*a'/sj
+            # --------------------------------------------------
+            LinearAlgebra.BLAS.ger!(-1 / sj, a, a, S_hat)
+        end
+
+        # optional numerical cleanup
+        S_hat .= 0.5 .* (S_hat .+ S_hat')
+    end
+
+    return LOG_SUM
+end
 
 #=
 Paper Notation          Code notation
