@@ -118,3 +118,39 @@ function compute_sigma_k_vec(Σ::SparseMatrixCSC; Mx::Int, My::Int, m::Int, m_pa
     # return σ_k_vec
 end 
 
+
+
+
+function evaluate_pq(γ, m)
+
+    function objective(pq)
+        a = pq[1:m+1]
+        b = pq[m+2:end]
+
+        loss = 0.0
+
+        xgrid = 0.0:0.001:1.0
+        target(x) = (1 - x)^(γ - floor(γ))
+
+        for x in xgrid
+            p = sum(a[k+1] * x^k for k in 0:m)
+            q = 1.0 + sum(b[k] * x^k for k in 1:m)
+
+            loss += (p / q - target(x))^2
+        end
+
+        return loss
+    end
+
+    pq = zeros(2m + 1)
+    pq[1] = 1.0   # p(x) ≈ 1 initially
+
+    result = optimize(objective, pq, BFGS())
+
+    θ_opt = Optim.minimizer(result)
+
+    p_opt = θ_opt[1:m+1]
+    q_opt = vcat(1.0, θ_opt[m+2:end])
+
+    return p_opt, q_opt
+end 

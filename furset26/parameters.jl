@@ -80,3 +80,43 @@ struct Rectangle <: SpatialDomain
     A1::Float64
     A2::Float64
 end 
+
+
+
+
+
+#### Transform parameters to make them satisfy certain numerical bounds. 
+function θ_to_η(η)
+
+    ν_s = exp(η[1]) + 0.25 
+    ν_t = 7.5 * exp(η[2]) / (3 + 2.5*exp(η[2])) + 0.25
+    r_t = exp(η[3]) + 0.005 
+    r_s = exp(η[4]) + 0.005 
+    σ = exp(η[5]) + 0.005 
+    β_s = exp(3*η[6]) / (2 + exp(3*η[6]))
+    σ_obs = exp(η[7])
+
+    θ = [
+        ν_s,
+        ν_t,
+        r_t,
+        r_s,
+        σ,
+        β_s,
+        σ_obs,
+    ]
+    return θ
+end 
+
+function η_to_θ(θ)
+    ν_s, ν_t, r_t, r_s, σ, β_s, σ_obs = θ
+    return [
+        log(ν_s - 0.25),
+        log((ν_t - 0.25)/2.5) - log(1 - (ν_t - 0.25)/3),
+        log(r_t - 0.005),
+        log(r_s - 0.005),
+        log(σ - 0.005),
+        log(2 * β_s / (1 - β_s)) / 3,
+        log(σ_obs),
+    ]
+end

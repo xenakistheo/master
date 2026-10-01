@@ -73,5 +73,5 @@ LOGLIKELIHOOD = KalmanFilter(;
     Σ=Σ, # process noise covariance
     H=H_full, # spatial coefficients matrix
     Y=Y_obs, # observation matrix 
-    σ_obs=σ_obs_LL, #IS THIS CORRECT?
+    σ_obs=σ_obs_LL, 
     )
