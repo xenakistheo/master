@@ -6,7 +6,8 @@ include("GRF.jl")
 include("kalman.jl")
 
 
-function loglikelihood(θ; H_spatial, D::Rectangle, Y_obs, Δt, N_init::Int=1000, Mx_inf::Int=8, My_inf::Int=8, m_order::Int=2)
+function loglikelihood(η; H_spatial, D::Rectangle, Y_obs, Δt, N_init::Int=1000, Mx_inf::Int=8, My_inf::Int=8, m_order::Int=2)
+    θ = η_to_θ(η)
     M_inf = Mx_inf * My_inf
     ν_s, ν_t, r_t, r_s, σ, β_s, σ_obs = θ
 

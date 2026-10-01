@@ -19,7 +19,7 @@ Mx_inf, My_inf = 8, 8
 
 H_spatial = build_observation_matrix(spatial_locations, Mx_inf, My_inf, D)
 
-loglikelihood(θ) = loglikelihood(θ; H_spatial=H_spatial, D=D, Y_obs=Y_obs, Δt=Δt, N_init=N_init, Mx_inf=Mx_inf, My_inf=My_inf, m_order=m_order)
+loglikelihood(η) = loglikelihood(η; H_spatial=H_spatial, D=D, Y_obs=Y_obs, Δt=Δt, N_init=N_init, Mx_inf=Mx_inf, My_inf=My_inf, m_order=m_order)
 
 function loglikelihood_beta(β_s)
 
@@ -40,7 +40,9 @@ function loglikelihood_beta(β_s)
         σ_obs_LL,
     ]
 
-    return loglikelihood(θ)
+    η = θ_to_η(θ)
+
+    return loglikelihood(η)
 end
 
 
