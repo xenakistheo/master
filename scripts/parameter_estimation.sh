@@ -36,7 +36,7 @@ echo "Job $SLURM_ARRAY_JOB_ID, task $SLURM_ARRAY_TASK_ID running on $(hostname) 
 cd "$SLURM_SUBMIT_DIR"
 
 module purge
-module load julia/1.12.2
+module load Julia/1.12.2
 
 # Use the allocated cores for Julia threads and BLAS (dense products in the Kalman filter).
 export JULIA_NUM_THREADS=$SLURM_CPUS_PER_TASK
