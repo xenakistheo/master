@@ -4,6 +4,10 @@ include("../GRF.jl")
 using LineSearches
 using JLD2
 using Optim
+using LinearAlgebra
+
+# The gradient is parallelized over Julia threads, so keep BLAS single-threaded to avoid oversubscription
+Threads.nthreads() > 1 && BLAS.set_num_threads(1)
 
 # Load simulated data and spatial locations
 @load "furset26/simulation_study/furset26_simulation_data.jld2" y_LL y_LH y_HL y_HH spatial_locations
@@ -38,6 +42,19 @@ function safe_objective(η)
 end
 
 
+# Central finite-difference gradient, with the 2 evaluations per coordinate run in parallel over threads.
+# Same step size as FiniteDiff.jl's default for central differences.
+function fd_grad!(g, η)
+    Threads.@threads for i in eachindex(η)
+        h = cbrt(eps(Float64)) * max(1.0, abs(η[i]))
+        e = zeros(length(η))
+        e[i] = h
+        g[i] = (safe_objective(η .+ e) - safe_objective(η .- e)) / (2h)
+    end
+    return g
+end
+
+
 # Set stopping critera 
 opts = Optim.Options(
     f_reltol   = 1e-8,    # relative change in objective
@@ -48,7 +65,7 @@ opts = Optim.Options(
     show_trace = true,
 )
 
-@time result = optimize(safe_objective, η0, BFGS(alphaguess = InitialStatic(scaled=true)), opts)
+@time result = optimize(safe_objective, fd_grad!, η0, BFGS(alphaguess = InitialStatic(scaled=true)), opts)
 
 η_opt = Optim.minimizer(result) # Extract the optimal parameters
 θ_opt = η_to_θ(η_opt) # Convert the optimal parameters to the interpretable form

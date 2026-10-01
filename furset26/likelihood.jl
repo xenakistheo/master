@@ -38,15 +38,17 @@ function loglikelihood(η; H_spatial, D::Rectangle, Y_obs, Δt, N_init::Int=1000
         S_init = F * S_init * F' + Σ
     end
 
-    H_full = build_full_spatial_matrix(H_spatial; Mx=Mx_inf, My=My_inf, m=m_order, m_params=params)
+    # Index of c_k (the observed component) in the state vector for each mode k
+    w = 2*m_order + floor(Int, params.γ)
+    idx = [1 + (k-1)*w for k in 1:M_inf]
 
-
-    LOGLIKELIHOOD = KalmanFilter(; 
+    LOGLIKELIHOOD = KalmanFilter_fast(; 
     m_hat_0=zeros(size(F, 1)), # mean
     S_hat_0=S_init, # covariance
     F=F, # state transition matrix
     Σ=Σ, # process noise covariance
-    H=H_full, # spatial coefficients matrix
+    H_spatial=H_spatial, # eigenfunctions at the observation locations
+    idx=idx, # observed state components
     Y=Y_obs, # observation matrix 
     σ_obs=σ_obs, 
     )

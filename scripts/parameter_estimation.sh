@@ -38,9 +38,10 @@ cd "$SLURM_SUBMIT_DIR"
 module purge
 module load Julia/1.12.2
 
-# Use the allocated cores for Julia threads and BLAS (dense products in the Kalman filter).
+# Use the allocated cores for Julia threads (the finite-difference gradient is parallelized over
+# threads); keep BLAS single-threaded so the threads don't compete for the same cores.
 export JULIA_NUM_THREADS=$SLURM_CPUS_PER_TASK
-export OPENBLAS_NUM_THREADS=$SLURM_CPUS_PER_TASK
+export OPENBLAS_NUM_THREADS=1
 
 # The Julia script reads the replication index from SLURM_ARRAY_TASK_ID.
 julia --project=. furset26/simulation_study/optimize_several_parameters.jl
