@@ -83,22 +83,22 @@ end
 
 
 
-function build_Σk_matrix(k; σ::Float64, m::Int, γ::Float64)
+function build_Σk_matrix(; σ::Float64, m::Int, γ::Float64)
     lγ = Int(floor(γ))
     Σ = spzeros(2*m + lγ, 2*m + lγ)
-    Σ[1, 1] = 1
-    Σ[1, m + lγ + 1] = 1
-    Σ[m + lγ + 1, 1] = 1
-    Σ[m + lγ + 1, m + lγ + 1] = 1
+    Σ[1, 1] = σ^2
+    Σ[1, m + lγ + 1] = σ^2
+    Σ[m + lγ + 1, 1] = σ^2
+    Σ[m + lγ + 1, m + lγ + 1] = σ^2
 
     return Σ
 end
 
 function build_Σ_blockmatrix(M; σ_vec::Vector{Float64}, m::Int, γ::Float64)
-    return blockdiag([build_Σk_matrix(k; σ = σ_vec[k], m = m, γ = γ) for k in 1:M]...)
+    return blockdiag([build_Σk_matrix(; σ = σ_vec[k], m = m, γ = γ) for k in 1:M]...)
 end
 
-function simulate_v(k; σ::Float64, m::Int, γ::Float64)
+function simulate_v(; σ::Float64, m::Int, γ::Float64)
     lγ = Int(floor(γ))
     v = spzeros(2*m + lγ)
     ϵ = rand(Normal(0, σ))
@@ -108,7 +108,7 @@ function simulate_v(k; σ::Float64, m::Int, γ::Float64)
 end 
 
 function simulate_v_long(M; σ_vec::Vector{Float64}, m::Int, γ::Float64)
-    return [simulate_v(k; σ = σ_vec[k], m = m, γ = γ) for k in 1:M]
+    return [simulate_v(; σ = σ_vec[k], m = m, γ = γ) for k in 1:M]
 end
 
 
@@ -121,8 +121,7 @@ function compute_sigma_k_vec(Σ::SparseMatrixCSC; Mx::Int, My::Int, m::Int, m_pa
 
     for k in 1:M
         idx = 1 + (k-1) * w
-        C0 = 4
-        σ_k_vec[k] = C0 / Σ[idx, idx]
+        σ_k_vec[k] = C0[k] / Σ[idx, idx]
     end 
     return σ_k_vec
 end 

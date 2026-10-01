@@ -42,7 +42,7 @@ F = build_F_blockmatrix(; Mx=Mx_inf, My=My_inf, D=D, m_params=params_LL, Δt=Δt
 S0 = 100 .* I
 
 # Perform initial steps to get the initial covariance matrix
-for i in 1:N_init
+for _ in 1:N_init
     S0 = F * S0 * F' + Σ0
 end
 
@@ -50,6 +50,10 @@ end
 σ_k = compute_sigma_k_vec(S0; Mx=Mx_inf, My=My_inf, m=m_order, m_params=params_LL, D=D)
 Σ = build_Σ_blockmatrix(M_inf; σ_vec=σ_k, m=m_order, γ=params_LL.γ)
 
+S_init = 100 .* I
+for _ in 1:N_init
+    S_init = F * S_init * F' + Σ
+end
 
 
 # Load simulated data and spatial locations
@@ -64,7 +68,7 @@ H_full = build_full_spatial_matrix(H_spatial; Mx=Mx_inf, My=My_inf, m=m_order, m
 # Run through Kalman Filter
 LOGLIKELIHOOD = KalmanFilter(; 
     m_hat_0=zeros(size(F, 1)), # mean
-    S_hat_0=S0, # covariance
+    S_hat_0=S_init, # covariance
     F=F, # state transition matrix
     Σ=Σ, # process noise covariance
     H=H_full, # spatial coefficients matrix

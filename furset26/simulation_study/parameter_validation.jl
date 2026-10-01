@@ -38,7 +38,7 @@ function loglikelihood(θ)
     S0 = 100 .* I
 
     # Perform initial steps to get the initial covariance matrix
-    for i in 1:N_init
+    for _ in 1:N_init
         S0 = F * S0 * F' + Σ0
     end
 
@@ -46,12 +46,18 @@ function loglikelihood(θ)
     σ_k = compute_sigma_k_vec(S0; Mx=Mx_inf, My=My_inf, m=m_order, m_params=params, D=D)
     Σ = build_Σ_blockmatrix(M_inf; σ_vec=σ_k, m=m_order, γ=params.γ)
 
+
+    S_init = 100 .* I
+    for _ in 1:N_init
+        S_init = F * S_init * F' + Σ
+    end
+
     H_full = build_full_spatial_matrix(H_spatial; Mx=Mx_inf, My=My_inf, m=m_order, m_params=params)
 
 
     LOGLIKELIHOOD = KalmanFilter(; 
     m_hat_0=zeros(size(F, 1)), # mean
-    S_hat_0=S0, # covariance
+    S_hat_0=S_init, # covariance
     F=F, # state transition matrix
     Σ=Σ, # process noise covariance
     H=H_full, # spatial coefficients matrix
@@ -73,14 +79,13 @@ function loglikelihood_beta(β_s)
     σ = 3.5
     σ_obs_LL = 0.35 
     
-
     θ = [
         ν_s,
         ν_t,
-        r_s,
         r_t,
-        β_s,
+        r_s,
         σ,
+        β_s,
         σ_obs_LL,
     ]
 
