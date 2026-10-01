@@ -7,7 +7,11 @@ using Optim
 
 # Load simulated data and spatial locations
 @load "furset26/simulation_study/furset26_simulation_data.jld2" y_LL y_LH y_HL y_HH spatial_locations
-Y_obs = y_LL[:, 1, :]
+
+# Replication index r: from the SLURM array task id, else the first command-line argument, else 1
+r = parse(Int, get(ENV, "SLURM_ARRAY_TASK_ID", isempty(ARGS) ? "1" : ARGS[1]))
+Y_obs = y_LL[:, r, :]
+println("Estimating parameters for replication r = ", r)
 
 
 # Fixed parameters
@@ -33,11 +37,23 @@ function safe_objective(η)
     return isfinite(v) ? v : 1e10
 end
 
-@time result = optimize(safe_objective, η0, BFGS(alphaguess = InitialStatic(scaled=true)), Optim.Options(show_trace=true))
+
+# Set stopping critera 
+opts = Optim.Options(
+    f_reltol   = 1e-8,    # relative change in objective
+    x_abstol   = 1e-4,    # change in η (log-scale for most parameters)
+    g_abstol   = 1e-5,    # realistic for finite-difference gradients
+    iterations = 200,
+    time_limit = 4 * 3600,
+    show_trace = true,
+)
+
+@time result = optimize(safe_objective, η0, BFGS(alphaguess = InitialStatic(scaled=true)), opts)
 
 η_opt = Optim.minimizer(result) # Extract the optimal parameters
 θ_opt = η_to_θ(η_opt) # Convert the optimal parameters to the interpretable form
 
+println(result)
 begin 
     println("ν_s = ", θ_opt[1])
     println("ν_t = ", θ_opt[2])
@@ -47,6 +63,14 @@ begin
     println("β_obs = ", θ_opt[6])
     println("σ_obs = ", θ_opt[7])
 end 
+
+# Save the estimates for this replication
+results_dir = "furset26/simulation_study/results/LL"
+mkpath(results_dir)
+converged = Optim.converged(result)
+iterations = Optim.iterations(result)
+minimum_value = Optim.minimum(result)
+@save joinpath(results_dir, "estimate_r$(lpad(r, 2, '0')).jld2") r θ_opt η_opt converged iterations minimum_value
 
 # TRUE VALUES 
 # ν_s = 1.0
