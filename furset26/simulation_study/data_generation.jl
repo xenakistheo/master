@@ -1,7 +1,8 @@
 include("../parameters.jl")
 include("../spectral_discretization.jl")
-include("../temporal_process.jl")
+include("../temporal_discretization.jl")
 
+using JLD2
 using Plots
 
 #### experiment
@@ -46,6 +47,8 @@ params_HL = maternParams_interpretable(d=2, ν_s=ν_s, ν_t=ν_t, r_s=r_s, r_t=r
 params_HH = maternParams_interpretable(d=2, ν_s=ν_s, ν_t=ν_t, r_s=r_s, r_t=r_t, β_s=β_s_HH, σ=σ)
 @time y_HH, C_HH, ϵ_HH = sample_GRF(interpretable_to_matern(params_HH),  H, D, Mx_sim, My_sim, N_spatial, N_temporal, σ_obs_HH, R)
 
+### SAVE y_LL, y_LH, y_HL, y_HH
+# @save "furset26/simulation_study/furset26_simulation_data.jld2" y_LL y_LH y_HL y_HH spatial_locations
 
 ##### VISUALIZE
 
@@ -56,6 +59,7 @@ y_HL_single = y_HL[:, 1, :]
 y_HH_single = y_HH[:, 1, :]
 
 # y = Array{Float64}(undef, N_temporal, R, N_spatial)
+# y_LL_single[1, :] # N_spatial vector
 
 
 # Extract coordinates

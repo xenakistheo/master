@@ -44,6 +44,10 @@ end
 function eigenvalue_μ(ξ::Float64, m::maternParams)
     return eigenvalue_μ(ξ; r=m.r, κ=m.κ, α=m.α)
 end
+function eigenvalue_μ(k::Int, m::maternParams; Mx::Int, D::Rectangle)
+    ξ = eigenvalue_ξ(D, k, Mx)
+    return eigenvalue_μ(ξ; r=m.r, κ=m.κ, α=m.α)
+end
 
 
 ##### EIGENVALUE λ

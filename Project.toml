@@ -1,6 +1,7 @@
 [deps]
 Arrow = "69666777-d1a9-59fb-9406-91d4454c9d45"
 BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
+DSP = "717857b8-e6f2-59f4-9121-6e50c889abd2"
 DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
 Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
 Feather = "becb17da-46f6-5d3c-ad1b-1c5fe96bc73c"
