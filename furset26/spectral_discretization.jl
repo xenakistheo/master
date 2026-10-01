@@ -45,7 +45,7 @@ function eigenvalue_μ(ξ::Float64, m::maternParams)
     return eigenvalue_μ(ξ; r=m.r, κ=m.κ, α=m.α)
 end
 function eigenvalue_μ(k::Int, m::maternParams; Mx::Int, D::Rectangle)
-    ξ = eigenvalue_ξ(D, k, Mx)
+    ξ = eigenvalue_ξ(D, k; Mx)
     return eigenvalue_μ(ξ; r=m.r, κ=m.κ, α=m.α)
 end
 
@@ -63,7 +63,7 @@ end
 
 ##### EIGENVALUES
 function eigenvalues(D::Rectangle, k::Int; Mx::Int, m::maternParams)
-    ξ = eigenvalue_ξ(D, k, Mx)
+    ξ = eigenvalue_ξ(D, k; Mx)
     μ = eigenvalue_μ(ξ, m)
     λ_tilde = eigenvalue_λ_unnormalized(ξ, m)
     return (; ξ, μ, λ_tilde)

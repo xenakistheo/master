@@ -1,6 +1,7 @@
 include("../parameters.jl")
 include("../spectral_discretization.jl")
 include("../temporal_discretization.jl")
+include("../GRF.jl")
 
 using JLD2
 using Plots

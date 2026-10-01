@@ -36,21 +36,11 @@ end
 
 
 # Double check that indexing (0,1) is correctly translated to julia. 
-function ϕ_func(k, i; μ, Δt, γ, p, m)
-    pre_factor = exp(-μ * i * Δt)
-    SUM = 0 
-    ζi = ζ_func(i; m = m, γ = γ)
-
-    # Calculate the coefficients of the polynomial P(z) = p(z) * (1 - z)^{⌊γ⌋}
-    r = floor(Int, γ)
-    b = [(-1)^j * binomial(r, j) for j in 0:r]
-    P = conv(p, b)
-
-    for j in 0:ζi
-        SUM += (-1)^(i-j) * binomial(Int(floor(γ)), (i-j)) * P[j+1]/P[1]
-    end 
-    return pre_factor * SUM
-end   
+  function ϕ_func(k, i; μ, Δt, γ, p, m)
+      r = floor(Int, γ)
+      P = conv(p, [(-1)^j * binomial(r, j) for j in 0:r])   # coefficients of p(z)(1-z)^⌊γ⌋
+      return -exp(-μ * i * Δt) * P[i+1] / P[1]
+  end 
 
 
 function build_Fk_matrix(k; m_params::maternParams, μ::Float64, Δt::Float64, m::Int, p::Vector{Float64}, q::Vector{Float64})
@@ -86,10 +76,10 @@ end
 function build_Σk_matrix(; σ::Float64, m::Int, γ::Float64)
     lγ = Int(floor(γ))
     Σ = spzeros(2*m + lγ, 2*m + lγ)
-    Σ[1, 1] = σ^2
-    Σ[1, m + lγ + 1] = σ^2
-    Σ[m + lγ + 1, 1] = σ^2
-    Σ[m + lγ + 1, m + lγ + 1] = σ^2
+    Σ[1, 1] = σ
+    Σ[1, m + lγ + 1] = σ
+    Σ[m + lγ + 1, 1] = σ
+    Σ[m + lγ + 1, m + lγ + 1] = σ
 
     return Σ
 end
@@ -116,13 +106,15 @@ end
 function compute_sigma_k_vec(Σ::SparseMatrixCSC; Mx::Int, My::Int, m::Int, m_params::maternParams, D::Rectangle)
     M = Mx * My
     σ_k_vec = zeros(M)
-    w = 2*m + Int(floor(m_params.γ)) # Width/height of each block
-    C0, _, _, _ = C_ck0(; D=D, Mx=Mx, My=My, m_params=m_params)
+    w = 2*m + floor(Int, m_params.γ) # Width/height of each block
+    C0 = C_ck0(; D=D, Mx=Mx, My=My, m_params=m_params).C0
+    c_star = sum(C0[k] * eigenfunction_f(D, 0.5, 0.5, k; Mx=Mx)^2 for k in 1:M)
 
-    for k in 1:M
-        idx = 1 + (k-1) * w
-        σ_k_vec[k] = C0[k] / Σ[idx, idx]
-    end 
-    return σ_k_vec
+    # for k in 1:M
+    #     idx = 1 + (k-1) * w
+    #     σ_k_vec[k] = C0[k] / Σ[idx, idx]
+    # end 
+    return [m_params.σ^2 * C0[k] / c_star / Σ[1 + (k-1)*w, 1 + (k-1)*w] for k in 1:M]
+    # return σ_k_vec
 end 
 
