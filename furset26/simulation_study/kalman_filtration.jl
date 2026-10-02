@@ -90,6 +90,17 @@ ll_batch = KalmanFilter_fast(;
     σ_obs=σ_obs_LL, 
 )
 
+ll_batch2 = KalmanFilter_fast2(; 
+    m_hat_0=zeros(size(F, 1)),
+    S_hat_0=S_init,
+    F=F,
+    Σ=Σ,
+    H_spatial=H_spatial,
+    idx=idx,
+    Y=Y_obs,
+    σ_obs=σ_obs_LL, 
+)
+
 ll_seq = KalmanFilter_sequential(; 
     m_hat_0=zeros(size(F, 1)),
     S_hat_0=S_init,
@@ -121,6 +132,17 @@ ll_seq = KalmanFilter_sequential(;
     )
 
 @btime KalmanFilter_fast(; 
+    m_hat_0=zeros(size($F, 1)),
+    S_hat_0=$S_init,
+    F=$F,
+    Σ=$Σ,
+    H_spatial=$H_spatial,
+    idx=$idx,
+    Y=$Y_obs,
+    σ_obs=$σ_obs_LL, 
+)
+
+@btime KalmanFilter_fast2(; 
     m_hat_0=zeros(size($F, 1)),
     S_hat_0=$S_init,
     F=$F,

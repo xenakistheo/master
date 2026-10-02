@@ -42,7 +42,7 @@ function loglikelihood(η; H_spatial, D::Rectangle, Y_obs, Δt, N_init::Int=1000
     w = 2*m_order + floor(Int, params.γ)
     idx = [1 + (k-1)*w for k in 1:M_inf]
 
-    LOGLIKELIHOOD = KalmanFilter_fast(; 
+    LOGLIKELIHOOD = KalmanFilter_fast2(; 
     m_hat_0=zeros(size(F, 1)), # mean
     S_hat_0=S_init, # covariance
     F=F, # state transition matrix

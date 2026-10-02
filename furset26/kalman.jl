@@ -124,6 +124,182 @@ function KalmanFilter_fast(;
     return LOG_SUM
 end
 
+
+
+
+"""
+Faster log-likelihood for the model without covariates. Same result as KalmanFilter with
+H = build_full_spatial_matrix(H_spatial; ...), but
+  - S is kept dense (it becomes dense after the first update), F stays sparse, and
+  - only the observed state components idx (c_k for each mode k) are multiplied by H_spatial.
+"""
+
+function KalmanFilter_fast2(;
+    m_hat_0,
+    S_hat_0,
+    F,              # sparse block diagonal matrix
+    Σ,
+    H_spatial,
+    idx,
+    Y,
+    σ_obs,
+)
+
+    # State
+    m_hat = copy(m_hat_0)
+    S_hat = Matrix{Float64}(S_hat_0)   # dense: S fills in after the first update
+
+    Σ_dense = Matrix(Σ)
+
+    d = length(m_hat)
+    n_obs = size(H_spatial, 1)
+
+    # ------------------------------------------------------------
+    # Preallocate
+    # ------------------------------------------------------------
+
+    m_tilde = similar(m_hat)
+
+    # Temporary for F*S
+    FS = similar(S_hat)
+
+    # Predicted covariance
+    S_tilde = similar(S_hat)
+
+    # S_tilde[:,idx] * H'
+    s = zeros(Float64, d, n_obs)
+
+    # innovation
+    Δy = zeros(Float64, n_obs)
+
+    # Kalman gain, and its transpose for the Cholesky solve
+    K = zeros(Float64, d, n_obs)
+    Kt = zeros(Float64, n_obs, d)
+
+    # innovation covariance
+    innovation_cov = zeros(Float64, n_obs, n_obs)
+
+    Ht = Matrix(transpose(H_spatial))
+
+    log2π = log(2π)
+
+    LOG_SUM = 0.0
+
+
+    for t in axes(Y,1)
+
+        # ========================================================
+        # Prediction
+        # ========================================================
+
+        # m^- = F*m
+        mul!(m_tilde, F, m_hat)
+
+
+        # S^- = F*S*F' + Q
+
+        # FS = F*S
+        mul!(FS, F, S_hat)
+
+        # S_tilde = FS*F'
+        mul!(S_tilde, FS, transpose(F))
+
+        # + process noise
+        S_tilde .+= Σ_dense
+
+
+
+        # ========================================================
+        # Observation update
+        # ========================================================
+
+        # s = P*H'
+        #
+        # Only c_k states are observed, hence idx
+        mul!(s, view(S_tilde, :, idx), Ht)
+
+
+        # Δy = y - H*m
+        mul!(Δy, H_spatial, view(m_tilde, idx))
+        Δy .= view(Y, t, :) .- Δy
+
+
+        # Innovation covariance:
+        #
+        # A = H*S*H' + σ²I
+
+        mul!(
+            innovation_cov,
+            H_spatial,
+            view(s, idx, :)
+        )
+
+        for i in 1:n_obs
+            innovation_cov[i,i] += σ_obs^2
+        end
+
+
+        cholA = cholesky!(
+            Symmetric(innovation_cov)
+        )
+
+
+        # ========================================================
+        # Kalman gain
+        # ========================================================
+
+        # K = s / A
+        #
+        # Solve A*K' = s'
+
+        transpose!(Kt, s)
+
+        ldiv!(cholA, Kt)
+
+        transpose!(K, Kt)
+
+
+
+        # ========================================================
+        # Mean update
+        # ========================================================
+
+        mul!(m_hat, K, Δy)
+        m_hat .+= m_tilde
+
+
+
+        # ========================================================
+        # Covariance update
+        # ========================================================
+
+        # S_hat = S_tilde - K*s'
+        mul!(S_hat, K, transpose(s))
+
+        S_hat .= S_tilde .- S_hat
+
+
+        # Keep symmetric
+        S_hat .= 0.5 .* (S_hat + transpose(S_hat))
+
+
+        # ========================================================
+        # Likelihood
+        # ========================================================
+
+        LOG_SUM += -0.5 * (
+            logdet(cholA) +
+            dot(Δy, cholA \ Δy) +
+            n_obs * log2π
+        )
+
+    end
+
+    return LOG_SUM
+end
+
+
+
 function KalmanFilter_sequential(;
     m_hat_0,
     S_hat_0,
