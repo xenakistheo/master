@@ -1,0 +1,57 @@
+Job 25525696, task 27 running on idun-03-06 at Fri  2 Oct 02:48:49 CEST 2026
+Estimating parameters for replication r = 27
+Iter     Function value   Gradient norm 
+     0     1.925736e+00     1.504211e+00
+ * time: 0.024689912796020508
+     1     1.564331e+00     2.787502e-01
+ * time: 0.8473789691925049
+     2     1.505228e+00     6.289213e-02
+ * time: 1.3864538669586182
+     3     1.496011e+00     1.221970e-01
+ * time: 1.9284718036651611
+     4     1.487486e+00     4.053100e-02
+ * time: 2.4657769203186035
+     5     1.484949e+00     3.196245e-02
+ * time: 3.0048179626464844
+     6     1.483561e+00     6.135807e-03
+ * time: 3.535592794418335
+     7     1.483519e+00     3.906330e-03
+ * time: 4.075544834136963
+     8     1.482515e+00     1.108602e-02
+ * time: 5.0469138622283936
+     9     1.481957e+00     1.994100e-02
+ * time: 10.562911987304688
+    10     1.481647e+00     4.022102e-02
+ * time: 17.6133029460907
+    11     1.481647e+00     6.791234e-03
+ * time: 47.341753005981445
+ 54.098621 seconds (50.88 M allocations: 5.368 GiB, 1.53% gc time, 48 lock conflicts, 28.61% compilation time)
+ * Status: success
+
+ * Candidate solution
+    Final objective value:     1.481647e+00
+
+ * Found with
+    Algorithm:     BFGS
+
+ * Convergence measures
+    |x - x'|               = 6.34e-05 ≤ 1.0e-04
+    |x - x'|/|x'|          = 3.27e-05 ≰ 0.0e+00
+    |f(x) - f(x')|         = 1.68e-07 ≰ 0.0e+00
+    |f(x) - f(x')|/|f(x')| = 1.13e-07 ≰ 1.0e-08
+    |g(x)|                 = 6.79e-03 ≰ 1.0e-05
+
+ * Work counters
+    Seconds run:   47  (vs limit 14400)
+    Iterations:    11
+    f(x) calls:    42
+    ∇f(x) calls:   42
+
+ν_s = 0.7603423999696446
+ν_t = 1.65621994348366
+r_t = 6.98100354168852
+r_s = 0.608628054746194
+σ = 5.411236526142141
+β_obs = 0.10601156110135376
+σ_obs = 0.8134727435467091
+Task 27 finished at Fri  2 Oct 02:49:51 CEST 2026
