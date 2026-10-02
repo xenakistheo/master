@@ -153,4 +153,84 @@ function evaluate_pq(γ, m)
     q_opt = vcat(1.0, θ_opt[m+2:end])
 
     return p_opt, q_opt
+end
+
+
+# Cache for evaluate_pq_fast, keyed on (γ, m). Locked since the gradient evaluates the likelihood on several threads.
+const PQ_CACHE = Dict{Tuple{Float64, Int}, Tuple{Vector{Float64}, Vector{Float64}}}()
+const PQ_CACHE_LOCK = ReentrantLock()
+
+"""
+Same result as evaluate_pq (bit for bit: same BFGS, same floating point operations in the objective),
+but x^k and the target (1 - x)^(γ - ⌊γ⌋) are precomputed on the grid instead of recomputed in every
+objective call, and the result is cached per (γ, m).
+"""
+function evaluate_pq_fast(γ, m)
+    key = (Float64(γ), m)
+    cached = lock(() -> get(PQ_CACHE, key, nothing), PQ_CACHE_LOCK)
+    cached === nothing || return cached
+
+    xgrid = collect(0.0:0.001:1.0)
+    target = [(1 - x)^(γ - floor(γ)) for x in xgrid]
+    xpow = [x^k for k in 0:m, x in xgrid] # (m+1) x length(xgrid)
+
+    function objective(pq)
+        loss = 0.0
+        @inbounds for i in eachindex(xgrid)
+            # p = a_0 + a_1 x + ... + a_m x^m, summed left to right as in evaluate_pq
+            p = pq[1] * xpow[1, i]
+            for k in 1:m
+                p += pq[k+1] * xpow[k+1, i]
+            end
+
+            # q = 1 + b_1 x + ... + b_m x^m
+            s = pq[m+2] * xpow[2, i]
+            for k in 2:m
+                s += pq[m+1+k] * xpow[k+1, i]
+            end
+            q = 1.0 + s
+
+            loss += (p / q - target[i])^2
+        end
+        return loss
+    end
+
+    pq = zeros(2m + 1)
+    pq[1] = 1.0   # p(x) ≈ 1 initially
+
+    result = optimize(objective, pq, BFGS())
+
+    θ_opt = Optim.minimizer(result)
+
+    p_opt = θ_opt[1:m+1]
+    q_opt = vcat(1.0, θ_opt[m+2:end])
+
+    lock(() -> (PQ_CACHE[key] = (p_opt, q_opt)), PQ_CACHE_LOCK)
+    return p_opt, q_opt
+end
+
+
+"""
+N steps of S ← F S F' + Σ from S = s0*I, for one w x w block of the block diagonal F and Σ,
+by repeated doubling (O(log N) small products instead of N):
+    S_N = F^N (s0 I) F^N' + W_N,    W_N = Σ_{i<N} F^i Σ F^i'.
+Returns (F^N, W_N) so that the same powers can be reused for any multiple of Σ.
+"""
+function propagate_block(Fk::Matrix{Float64}, Σk::Matrix{Float64}, N::Int)
+    w = size(Fk, 1)
+    A_res, W_res = Matrix{Float64}(I, w, w), zeros(w, w)   # 0 steps
+    A_pow, W_pow = copy(Fk), copy(Σk)                      # 2^j steps
+    n = N
+    while n > 0
+        if isodd(n)
+            # (res steps) followed by (pow steps)
+            W_res = W_pow + A_pow * W_res * A_pow'
+            A_res = A_pow * A_res
+        end
+        n >>= 1
+        n > 0 || break
+        W_pow = W_pow + A_pow * W_pow * A_pow'
+        A_pow = A_pow * A_pow
+    end
+    return A_res, W_res
 end 

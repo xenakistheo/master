@@ -29,7 +29,7 @@ Mx_inf, My_inf = 8, 8
 H_spatial = build_observation_matrix(spatial_locations, Mx_inf, My_inf, D)
 
 # Define the objective function, scale by number of observations for numerical stability
-objective(η) = -loglikelihood(η; H_spatial=H_spatial, D=D, Y_obs=Y_obs, Δt=Δt, N_init=N_init, Mx_inf=Mx_inf, My_inf=My_inf, m_order=m_order) / length(Y_obs)
+objective(η) = -loglikelihood_fast(η; H_spatial=H_spatial, D=D, Y_obs=Y_obs, Δt=Δt, N_init=N_init, Mx_inf=Mx_inf, My_inf=My_inf, m_order=m_order) / length(Y_obs)
 
 η0 = θ_to_η([1.0, 1.0, 5.0, 0.5, 2.0, 0.3, 0.5]) # Initial guess for the parameters
 
