@@ -69,15 +69,15 @@ idx = 1:d_block:size(F, 1) # index of c_k for each mode k
 
 # Run through Kalman Filter
 # Run through Kalman Filter
-ll_plain = KalmanFilter(; 
-    m_hat_0=zeros(size(F, 1)), # mean
-    S_hat_0=S_init, # covariance
-    F=F, # state transition matrix
-    Σ=Σ, # process noise covariance
-    H=H_full, # spatial coefficients matrix
-    Y=Y_obs, # observation matrix 
-    σ_obs=σ_obs_LL, 
-    )
+# ll_plain = KalmanFilter(; 
+#     m_hat_0=zeros(size(F, 1)), # mean
+#     S_hat_0=S_init, # covariance
+#     F=F, # state transition matrix
+#     Σ=Σ, # process noise covariance
+#     H=H_full, # spatial coefficients matrix
+#     Y=Y_obs, # observation matrix 
+#     σ_obs=σ_obs_LL, 
+#     )
 
 ll_batch = KalmanFilter_fast(; 
     m_hat_0=zeros(size(F, 1)),
@@ -91,6 +91,17 @@ ll_batch = KalmanFilter_fast(;
 )
 
 ll_batch2 = KalmanFilter_fast2(; 
+    m_hat_0=zeros(size(F, 1)),
+    S_hat_0=S_init,
+    F=F,
+    Σ=Σ,
+    H_spatial=H_spatial,
+    idx=idx,
+    Y=Y_obs,
+    σ_obs=σ_obs_LL, 
+)
+
+ll_batch3 = KalmanFilter_fast3(; 
     m_hat_0=zeros(size(F, 1)),
     S_hat_0=S_init,
     F=F,
@@ -121,15 +132,15 @@ ll_seq = KalmanFilter_sequential(;
 @show ll_batch - ll_plain
 
 ##### BENCHMARK TIME
-@btime KalmanFilter(; 
-    m_hat_0=zeros(size($F, 1)), # mean
-    S_hat_0=$S_init, # covariance
-    F=$F, # state transition matrix
-    Σ=$Σ, # process noise covariance
-    H=$H_full, # spatial coefficients matrix
-    Y=$Y_obs, # observation matrix 
-    σ_obs=$σ_obs_LL, 
-    )
+# @btime KalmanFilter(; 
+#     m_hat_0=zeros(size($F, 1)), # mean
+#     S_hat_0=$S_init, # covariance
+#     F=$F, # state transition matrix
+#     Σ=$Σ, # process noise covariance
+#     H=$H_full, # spatial coefficients matrix
+#     Y=$Y_obs, # observation matrix 
+#     σ_obs=$σ_obs_LL, 
+#     )
 
 @btime KalmanFilter_fast(; 
     m_hat_0=zeros(size($F, 1)),
@@ -143,6 +154,28 @@ ll_seq = KalmanFilter_sequential(;
 )
 
 @btime KalmanFilter_fast2(; 
+    m_hat_0=zeros(size($F, 1)),
+    S_hat_0=$S_init,
+    F=$F,
+    Σ=$Σ,
+    H_spatial=$H_spatial,
+    idx=$idx,
+    Y=$Y_obs,
+    σ_obs=$σ_obs_LL, 
+)
+
+@btime KalmanFilter_fast3(; 
+    m_hat_0=zeros(size($F, 1)),
+    S_hat_0=$S_init,
+    F=$F,
+    Σ=$Σ,
+    H_spatial=$H_spatial,
+    idx=$idx,
+    Y=$Y_obs,
+    σ_obs=$σ_obs_LL, 
+)
+
+@btime KalmanFilter_fast4(; 
     m_hat_0=zeros(size($F, 1)),
     S_hat_0=$S_init,
     F=$F,

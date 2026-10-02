@@ -300,6 +300,272 @@ end
 
 
 
+"""
+Same log-likelihood as KalmanFilter_fast2, but the observation update is done in the
+k = length(idx) dimensional space of the observed states instead of the n_obs dimensional
+observation space. With R = σ²I and G = H'H (H = H_spatial, assumed full column rank),
+Woodbury gives, for P = S_tilde, B = P[idx,idx] + σ² G⁻¹ and A = H P[idx,idx] H' + σ²I:
+  - H' A⁻¹ H  = B⁻¹                         ⇒  S_hat = P - P[:,idx] B⁻¹ P[idx,:]
+  - H' A⁻¹ Δy = B⁻¹ z,  z = G⁻¹H'y - c̃       ⇒  m_hat = m_tilde + P[:,idx] B⁻¹ z
+  - logdet A  = (n_obs - k) log σ² + logdet G + logdet B
+  - Δy'A⁻¹Δy  = (y'y - y'H G⁻¹H'y) / σ² + z'B⁻¹z
+so no n_obs x n_obs matrix is ever formed. G⁻¹H'Y and the residual term are precomputed.
+"""
+function KalmanFilter_fast3(;
+    m_hat_0,
+    S_hat_0,
+    F,              # sparse block diagonal matrix
+    Σ,              # sparse process noise covariance
+    H_spatial,
+    idx,
+    Y,
+    σ_obs,
+)
+
+    d = length(m_hat_0)
+    n_obs, k = size(H_spatial)
+    σ2 = σ_obs^2
+
+    # ------------------------------------------------------------
+    # Precompute everything that does not depend on the state
+    # ------------------------------------------------------------
+
+    G = Symmetric(H_spatial' * H_spatial)
+    cholG = cholesky(G)
+    σ2_Ginv = σ2 .* inv(cholG)                   # σ² G⁻¹ (k x k)
+
+    HtY = H_spatial' * transpose(Y)              # k x T
+    Z_y = cholG \ HtY                            # G⁻¹H'y_t for every t
+
+    # Part of the quadratic form orthogonal to range(H): y'y - y'H G⁻¹ H'y
+    resid2 = [dot(view(Y, t, :), view(Y, t, :)) - dot(view(HtY, :, t), view(Z_y, :, t)) for t in axes(Y, 1)]
+
+    const_ll = n_obs * log(2π) + (n_obs - k) * log(σ2) + logdet(cholG)
+
+    # Nonzeros of Σ, added to S_tilde without forming a dense copy
+    Σ_I, Σ_J, Σ_V = findnz(sparse(Σ))
+
+    # ------------------------------------------------------------
+    # Preallocate
+    # ------------------------------------------------------------
+
+    m_hat = Vector{Float64}(m_hat_0)
+    S_hat = Matrix{Float64}(S_hat_0)
+
+    m_tilde = similar(m_hat)
+    FS = similar(S_hat)
+    FSt = similar(S_hat)
+    S_tilde = similar(S_hat)
+
+    B = zeros(Float64, k, k)
+    X = zeros(Float64, k, d)                     # U⁻ᵀ P[idx,:], with B = U'U
+    z = zeros(Float64, k)
+
+    LOG_SUM = 0.0
+
+    for t in axes(Y, 1)
+
+        # ========================================================
+        # Prediction
+        # ========================================================
+
+        mul!(m_tilde, F, m_hat)
+
+        # S_tilde = F*S*F' computed as F*(F*S)' so both products are sparse * dense
+        mul!(FS, F, S_hat)
+        transpose!(FSt, FS)
+        mul!(S_tilde, F, FSt)
+
+        @inbounds for n in eachindex(Σ_V)
+            S_tilde[Σ_I[n], Σ_J[n]] += Σ_V[n]
+        end
+
+        # ========================================================
+        # Observation update in the k observed states
+        # ========================================================
+
+        # B = P[idx,idx] + σ² G⁻¹
+        B .= view(S_tilde, idx, idx) .+ σ2_Ginv
+        cholB = cholesky!(Symmetric(B, :U))
+        U = cholB.U
+
+        # z = G⁻¹H'y - c̃
+        z .= view(Z_y, :, t) .- view(m_tilde, idx)
+
+        # X = U⁻ᵀ P[idx,:]  and  z ← U⁻ᵀ z
+        X .= view(S_tilde, idx, :)
+        ldiv!(U', X)
+        ldiv!(U', z)
+
+        # m_hat = m_tilde + P[:,idx] B⁻¹ z = m_tilde + X'(U⁻ᵀ z)
+        copyto!(m_hat, m_tilde)
+        mul!(m_hat, transpose(X), z, 1.0, 1.0)
+
+        # S_hat = P - X'X (symmetric rank-k update, upper triangle, then mirrored)
+        copyto!(S_hat, S_tilde)
+        BLAS.syrk!('U', 'T', -1.0, X, 1.0, S_hat)
+        LinearAlgebra.copytri!(S_hat, 'U')
+
+        # ========================================================
+        # Likelihood
+        # ========================================================
+
+        LOG_SUM += -0.5 * (const_ll + logdet(cholB) + resid2[t] / σ2 + dot(z, z))
+
+    end
+
+    return LOG_SUM
+end
+
+
+
+"""
+C = A * F', given Ft = sparse(F') (column i of Ft holds row i of F).
+Each column of C is a short linear combination of contiguous columns of A, which is much
+faster than the generic sparse * dense mul! for the companion-form blocks of F.
+"""
+function _mul_Ft!(C::Matrix{Float64}, A::Matrix{Float64}, Ft::SparseMatrixCSC{Float64})
+    n = size(A, 1)
+    rv = rowvals(Ft)
+    nzv = nonzeros(Ft)
+    @inbounds for i in axes(C, 2)
+        rng = nzrange(Ft, i)
+        if isempty(rng)
+            for r in 1:n
+                C[r, i] = 0.0
+            end
+            continue
+        end
+        p = first(rng)
+        j, v = rv[p], nzv[p]
+        @simd for r in 1:n
+            C[r, i] = v * A[r, j]
+        end
+        for p in first(rng)+1:last(rng)
+            j, v = rv[p], nzv[p]
+            @simd for r in 1:n
+                C[r, i] = muladd(v, A[r, j], C[r, i])
+            end
+        end
+    end
+    return C
+end
+
+
+"""
+Same algorithm as KalmanFilter_fast3, with a faster prediction step:
+  - F*S*F' is computed as T = S*F', then F*S*F' = T'*F', both with the column kernel _mul_Ft!
+    instead of the generic sparse * dense mul!.
+  - Prediction and update are done in place in S_hat (no separate S_tilde copy).
+"""
+function KalmanFilter_fast4(;
+    m_hat_0,
+    S_hat_0,
+    F,              # sparse block diagonal matrix
+    Σ,              # sparse process noise covariance
+    H_spatial,
+    idx,
+    Y,
+    σ_obs,
+)
+
+    d = length(m_hat_0)
+    n_obs, k = size(H_spatial)
+    σ2 = σ_obs^2
+
+    # ------------------------------------------------------------
+    # Precompute everything that does not depend on the state
+    # ------------------------------------------------------------
+
+    G = Symmetric(H_spatial' * H_spatial)
+    cholG = cholesky(G)
+    σ2_Ginv = σ2 .* inv(cholG)                   # σ² G⁻¹ (k x k)
+
+    HtY = H_spatial' * transpose(Y)              # k x T
+    Z_y = cholG \ HtY                            # G⁻¹H'y_t for every t
+
+    # Part of the quadratic form orthogonal to range(H): y'y - y'H G⁻¹ H'y
+    resid2 = [dot(view(Y, t, :), view(Y, t, :)) - dot(view(HtY, :, t), view(Z_y, :, t)) for t in axes(Y, 1)]
+
+    const_ll = n_obs * log(2π) + (n_obs - k) * log(σ2) + logdet(cholG)
+
+    F_sp = SparseMatrixCSC{Float64}(sparse(F))
+    Ft = SparseMatrixCSC{Float64}(sparse(F_sp'))
+
+    # Nonzeros of Σ, added to S without forming a dense copy
+    Σ_I, Σ_J, Σ_V = findnz(sparse(Σ))
+
+    # ------------------------------------------------------------
+    # Preallocate
+    # ------------------------------------------------------------
+
+    m_hat = Vector{Float64}(m_hat_0)
+    S = Matrix{Float64}(S_hat_0)                 # holds S_hat, and S_tilde within a step
+
+    m_tilde = similar(m_hat)
+    T1 = similar(S)
+    T2 = similar(S)
+
+    B = zeros(Float64, k, k)
+    X = zeros(Float64, k, d)                     # U⁻ᵀ P[idx,:], with B = U'U
+    z = zeros(Float64, k)
+
+    LOG_SUM = 0.0
+
+    for t in axes(Y, 1)
+
+        # ========================================================
+        # Prediction
+        # ========================================================
+
+        mul!(m_tilde, F_sp, m_hat)
+
+        _mul_Ft!(T1, S, Ft)                      # T1 = S F'
+        transpose!(T2, T1)                       # T2 = F S
+        _mul_Ft!(S, T2, Ft)                      # S  = F S F'
+
+        @inbounds for n in eachindex(Σ_V)
+            S[Σ_I[n], Σ_J[n]] += Σ_V[n]
+        end
+
+        # ========================================================
+        # Observation update in the k observed states
+        # ========================================================
+
+        # B = P[idx,idx] + σ² G⁻¹
+        B .= view(S, idx, idx) .+ σ2_Ginv
+        cholB = cholesky!(Symmetric(B, :U))
+        U = cholB.U
+
+        # z = G⁻¹H'y - c̃
+        z .= view(Z_y, :, t) .- view(m_tilde, idx)
+
+        # X = U⁻ᵀ P[idx,:]  and  z ← U⁻ᵀ z
+        X .= view(S, idx, :)
+        ldiv!(U', X)
+        ldiv!(U', z)
+
+        # m_hat = m_tilde + X'(U⁻ᵀ z)
+        copyto!(m_hat, m_tilde)
+        mul!(m_hat, transpose(X), z, 1.0, 1.0)
+
+        # S_hat = P - X'X (upper triangle, then mirrored)
+        BLAS.syrk!('U', 'T', -1.0, X, 1.0, S)
+        LinearAlgebra.copytri!(S, 'U')
+
+        # ========================================================
+        # Likelihood
+        # ========================================================
+
+        LOG_SUM += -0.5 * (const_ll + logdet(cholB) + resid2[t] / σ2 + dot(z, z))
+
+    end
+
+    return LOG_SUM
+end
+
+
+
 function KalmanFilter_sequential(;
     m_hat_0,
     S_hat_0,
