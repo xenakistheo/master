@@ -14,8 +14,10 @@ Threads.nthreads() > 1 && BLAS.set_num_threads(1)
 
 # Replication index r: from the SLURM array task id, else the first command-line argument, else 1
 r = parse(Int, get(ENV, "SLURM_ARRAY_TASK_ID", isempty(ARGS) ? "1" : ARGS[1]))
-Y_obs = y_LL[:, r, :]
-println("Estimating parameters for replication r = ", r)
+# Scenario (LL, LH, HL or HH): from the SCENARIO environment variable, else LL
+scenario = get(ENV, "SCENARIO", "LL")
+Y_obs = Dict("LL" => y_LL, "LH" => y_LH, "HL" => y_HL, "HH" => y_HH)[scenario][:, r, :]
+println("Estimating parameters for scenario ", scenario, ", replication r = ", r)
 
 
 # Fixed parameters
@@ -82,7 +84,7 @@ begin
 end 
 
 # Save the estimates for this replication
-results_dir = "furset26/simulation_study/results/LL"
+results_dir = "furset26/simulation_study/results/$scenario"
 mkpath(results_dir)
 converged = Optim.converged(result)
 iterations = Optim.iterations(result)
